@@ -1,0 +1,118 @@
+import sqlite3
+from datetime import datetime
+
+# Database Initialization
+conn = sqlite3.connect('inventory.db')
+cursor = conn.cursor()
+
+# Create Products Table
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        price REAL,
+        stock INTEGER
+    )
+''')
+conn.commit()
+
+# Create Orders Table
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY,
+        product_id INTEGER,
+        quantity INTEGER,
+        order_date TEXT,
+        FOREIGN KEY (product_id) REFERENCES products (id)
+    )
+''')
+conn.commit()
+
+
+# Product Management
+def add_product(name, price, stock):
+    cursor.execute('INSERT INTO products (name, price, stock) VALUES (?, ?, ?)', (name, price, stock))
+    conn.commit()
+
+
+def list_products():
+    cursor.execute('SELECT * FROM products')
+    products = cursor.fetchall()
+    for product in products:
+        print(product)
+
+
+# Stock Tracking
+def update_stock(product_id, quantity):
+    cursor.execute('UPDATE products SET stock = stock + ? WHERE id = ?', (quantity, product_id))
+    conn.commit()
+
+
+# Order Processing
+def process_order(product_id, quantity):
+    cursor.execute('SELECT stock FROM products WHERE id = ?', (product_id,))
+    available_stock = cursor.fetchone()[0]
+
+    if available_stock >= quantity:
+        order_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute('INSERT INTO orders (product_id, quantity, order_date) VALUES (?, ?, ?)',
+                       (product_id, quantity, order_date))
+        update_stock(product_id, -quantity)
+        conn.commit()
+        print('Order processed successfully.')
+    else:
+        print('Insufficient stock to fulfill the order.')
+
+
+# Reporting
+def generate_report():
+    cursor.execute('''
+        SELECT p.name, p.price, SUM(o.quantity) AS total_sold
+        FROM products AS p
+        LEFT JOIN orders AS o ON p.id = o.product_id
+        GROUP BY p.id
+    ''')
+    report = cursor.fetchall()
+    for item in report:
+        print(f"Product: {item[0]}, Price: {item[1]}, Total Sold: {item[2]}")
+
+
+# Main Menu
+def main_menu():
+    while True:
+        print("\nInventory Management System")
+        print("1. Add Product")
+        print("2. List Products")
+        print("3. stock tracking")
+        print("4. Process Order")
+        print("5. Generate Report")
+        print("6. Exit")
+
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            name = input("Enter product name: ")
+            price = float(input("Enter product price: "))
+            stock = int(input("Enter initial stock: "))
+            add_product(name, price, stock)
+        elif choice == '2':
+            list_products()
+        elif choice == '3':
+            product_id = int(input("Enter product ID: "))
+            quantity = int(input("Enter order quantity: "))
+        elif choice == '4':
+            product_id = int(input("Enter product ID: "))
+            quantity = int(input("Enter order quantity: "))
+            process_order(product_id, quantity)
+        elif choice == '5':
+            generate_report()
+        elif choice == '6':
+            conn.close()
+            print("Exiting...")
+            break
+        else:
+            print("Invalid choice. Please try again.")
+
+
+if __name__ == "__main__":
+    main_menu()
